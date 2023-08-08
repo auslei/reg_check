@@ -6,7 +6,7 @@ import tqdm
 import os
 
 
-#%%
+#%% This function takes a combined string
 def extract_document_structure(text):
     schedule_pattern = re.compile(r'^\s+(\d+)\s+([A-Z].*)$')
     part_pattern = re.compile(r'^Part\s+(\d+\.\d+)\s+([A-Z].*)$')  # Updated to match "Part", followed by a space and part number
@@ -112,7 +112,6 @@ else:
 data = extract_document_structure(text)
 
 # %% Persist into a chroma DB
-
 import chromadb
 import uuid
 from chromadb.utils import embedding_functions
