@@ -97,55 +97,75 @@ def find_clause(clause_number: str, data: list) -> dict:
     return {}
 
 
-#%% load pdf
-path = "./data/abcb-housing-provisions-2022-20230501b.pdf"
-text_path = "./data/abcb-housing-provisions-2022-20230501b.txt"
+#%% load pdf return as a string
+def pdf2text(pdf_path = "./data/abcb-housing-provisions-2022-20230501b.pdf", text_path = "./data/abcb-housing-provisions-2022-20230501b.txt"):
+    if os.path.exists(text_path):
+        text = open(text_path, "r").read()
+    else:
+        reader = PyPDF2.PdfReader(pdf_path)
+        text = '\n'.join(page.extract_text() for page in reader.pages)
+        with open(text_path, "+w") as f:
+            f.write("\n".join(text))
+    return text
 
-if os.path.exists(text_path):
-    text = open(text_path, "r").read()
-else:
-    reader = PyPDF2.PdfReader(path)
-    text = '\n'.join(page.extract_text() for page in reader.pages)
-    with open("./data/abcb-housing-provisions-2022-20230501b.txt", "+w") as f:
-        f.write("\n".join(text))
+#%% Text Summarisation
+from transformers import pipeline
 
-data = extract_document_structure(text)
+def summarise(large_text, max_token):
+    summariser = pipeline("summarization", model="facebook/bart-large-cnn")
+    return None
+
 
 # %% Persist into a chroma DB
 import chromadb
-import uuid
 from chromadb.utils import embedding_functions
-#import pandas as pd
-#df = pd.DataFrame(data)
-chroma_path  = "./db"
-client = chromadb.PersistentClient(path=chroma_path)
-sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-collection = client.get_or_create_collection("abcb_housing_provisions", embedding_function = sentence_transformer_ef)
 
-#%%
-documents = []
-meta_data = []
-ids = []
+def create_or_update_vectordb(pdf_path = "./data/abcb-housing-provisions-2022-20230501b.pdf", chroma_path = "./db"):
+    text_path = os.path.splitext(pdf_path)[0] + ".txt"
+    data = extract_document_structure(pdf2text(pdf_path = pdf_path,
+                                               text_path = text_path))
+    client = chromadb.PersistentClient(path=chroma_path)
+    sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+    collection = client.get_or_create_collection("abcb_housing_provisions", embedding_function = sentence_transformer_ef)
 
-for d in data:
-  ids.append(d["clause_number"])
-  meta_data.append({"schedule_number": d["schedule_number"], 
-                           "schedule_title": d["schedule_title"],
-                           "part_number": d["part_number"],
-                           "part_title": d["part_title"],
-                           "clause_number": d["clause_number"],
-                           "clause_title": d["clause_title"]})
-  documents.append(d["clause_content"])
+    documents = []
+    meta_data = []
+    ids = []
 
-# Add docs to the collection. Can also update and delete. Row-based API coming soon!
-collection.upsert(
-    ids = ids,
-    documents = documents,
-    metadatas = meta_data
-)
+    for d in data:
+        ids.append(d["clause_number"])
+
+
+        meta_data.append({"schedule_number": d["schedule_number"], 
+                                "schedule_title": d["schedule_title"],
+                                "part_number": d["part_number"],
+                                "part_title": d["part_title"],
+                                "clause_number": d["clause_number"],
+                                "clause_title": d["clause_title"]})
+        documents.append(d["clause_content"])
+
+    # Add docs to the collection. Can also update and delete. Row-based API coming soon!
+    collection.upsert(
+        ids = ids,
+        documents = documents,
+        metadatas = meta_data
+    )
+
+
+# get database for view
+def get_collection(db_path = "./db", collection_name = "abcb_housing_provisions"):
+    client = chromadb.PersistentClient(db_path)
+    collection = client.get_collection(collection_name)
+    return collection
 
 #%% Test Code
+from transformers import pipeline
+
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+
 n_results = 3
+
+collection = get_collection()
 
 results = collection.query(
     query_texts=["What is the staircase requirements."],
@@ -166,6 +186,30 @@ for i in range(n_results):
     print(f"Part {part_number}  {part_title}\n")
     print(f"Clause {id}  {clause_title}")
     print(d)
+    print(len(d))
+    print("-".join([" " for i in range(20)]))
+    print(summarizer(d))
     print("-".join([" " for i in range(20)]))
 
 
+# %%
+summaries = summarizer(results["documents"][0], max_length=130, min_length=30, do_sample=False)
+# %%
+summaries = summarizer(results["documents"])
+
+#%%
+
+for x in results["documents"][0]:
+    print(summarizer(x)[0]['summary_text'])
+# %%
+from transformers import AutoTokenizer
+
+t = AutoTokenizer("all-MiniLM-L6-v2")
+# %%
+from transformers import AutoTokenizer
+
+tokeniser = AutoTokenizer.from_pretrained("google/flan-t5-base")
+tokens = tokeniser.encode("this is a test")
+tokeniser.decode(tokens)
+
+# %%

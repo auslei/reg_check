@@ -22,36 +22,37 @@ def get_llm_pipeline(model_name):
 #%%
 hf_auth = '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'
 
-model_name = "meta-llama/Llama-2-7b-chat-hf"
-model_name = "tiiuae/falcon-40b-instruct"
+# experienmentation
+def get_llm2():
+    model_name = "meta-llama/Llama-2-7b-chat-hf"
+    model_name = "tiiuae/falcon-40b-instruct"
 
-tokenizer = AutoTokenizer.from_pretrained(model_name,
-                                          use_auth_token = hf_auth)
+    tokenizer = AutoTokenizer.from_pretrained(model_name,
+                                            use_auth_token = hf_auth)
 
-#%%
-#model = AutoModelForCausalLM.from_pretrained(model_name)#,
-                                             #device_map='auto',
-                                             #torch_dtype=torch.float16,
-                                             #use_auth_token=hf_auth,
-                                             #load_in_8bit=True)#,
-                                             #load_in_4bit=True)
-model = AutoModelForCausalLM.from_pretrained("tiiuae/falcon-40b-instruct")
-inputs = tokenizer("What's the best way to divide a pizza between three people?", return_tensors="pt")
-outputs = model.generate(**inputs, max_length=50)
-## %%
-from transformers import pipeline
+    #model = AutoModelForCausalLM.from_pretrained(model_name)#,
+                                                #device_map='auto',
+                                                #torch_dtype=torch.float16,
+                                                #use_auth_token=hf_auth,
+                                                #load_in_8bit=True)#,
+                                                #load_in_4bit=True)
+    model = AutoModelForCausalLM.from_pretrained("tiiuae/falcon-40b-instruct")
+    inputs = tokenizer("What's the best way to divide a pizza between three people?", return_tensors="pt")
+    outputs = model.generate(**inputs, max_length=50)
+    ## %%
+    from transformers import pipeline
 
-pipe = pipeline("text-generation",
-                model=model,
-                tokenizer= tokenizer,
-                torch_dtype=torch.bfloat16,
-                device_map="auto",
-                max_new_tokens = 512,
-                do_sample=True,
-                top_k=30,
-                num_return_sequences=1,
-                eos_token_id=tokenizer.eos_token_id
-                )
-# %%
-pipe("what is up?")
-# %%
+    pipe = pipeline("text-generation",
+                    model=model,
+                    tokenizer= tokenizer,
+                    torch_dtype=torch.bfloat16,
+                    device_map="auto",
+                    max_new_tokens = 512,
+                    do_sample=True,
+                    top_k=30,
+                    num_return_sequences=1,
+                    eos_token_id=tokenizer.eos_token_id
+                    )
+    
+    pipe("what is up?")
+    
