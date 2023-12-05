@@ -1,5 +1,8 @@
 .env
-__pychache__
+*pychache*
 .ipynb_checkpoints
 offload
+.DS_Store
+db
+models
 .DS_Store
