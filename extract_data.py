@@ -209,3 +209,78 @@ def get_collection(db_path = "./db", collection_name = "abcb_housing_provisions"
 
 # %%
 #create_or_update_vectordb()
+
+import pdfplumber
+
+pdf = pdfplumber.open("./data/abcb-housing-provisions-2022-20230501b.pdf")
+
+# %%
+bbox = (10, 10, 580, 840)
+example = pdf.pages[81]
+
+print(example.extract_text_lines())
+print(example.extract_tables())
+# %%
+example = pdf.pages[81]
+bbox = (0, 60, 540, 820)
+example_cropped = example.crop(bbox=bbox)
+print(example_cropped.extract_text())
+# %%
+tables = example_cropped.extract_tables()
+# %%
+import json
+
+
+class BCC_Page():
+    def __init__(self, text: str, bbox = (0, 60, 540, 820)) -> None:
+        self.bbox = bbox
+        self.raw_text = text
+        return
+
+    # get the list of tables and return as a list of json objects
+    def _get_page_tables(self):
+
+
+
+    def _process_table_to_json(table_data):
+        # Replace None values in the first row with a specified fallback value
+        fallback_value = table_data[0][2]  # Assuming 'Thickness of wall (T)' is at index 2
+        table_data[0] = [fallback_value if item is None else item for item in table_data[0]]
+
+        # Merge the first and second rows to create a unified header
+        header = [f'{col1} - {col2}' if col2 else col1 for col1, col2 in zip(table_data[0], table_data[1])]
+
+        # Process the remaining rows into a list of dictionaries
+        table_body = [{header[i]: row[i] for i in range(len(header))} for row in table_data[2:-1]]
+
+        # Extract the footer
+        footer = table_data[-1][0]
+
+        # Create the JSON object
+        table_json = {
+            "header": header,
+            "body": table_body,
+            "footer": footer
+        }
+
+        return json.dumps(table_json, indent=2)  # Convert to formatted JSON string
+
+# Your table data
+table_data = [
+    ['Element', 'Symbol used in Figure\n5.4.2c', 'Thickness of wall (T)', None, None, None],
+    [None, None, '90', '110', '140', '190'],
+    ['Return length (minimum)', 'R', '450', '450', '–', '–'],
+    ['Spacing of returns\n(maximum) (N2)', 'S', '1050', '1300', '–', '–'],
+    ['Spacing of returns\n(maximum) (N3)', 'S', '600', '750', '–', '–'],
+    ['Height (maximum)', 'H', '2400', '2400', '1700 (N2)', '2300 (N2)'],
+    ['Table Notes\n(1) Dimensions are in mm.\n(2) Return supports are not required for 140 mm and 190 mm thick walls.', None, None, None, None, None]
+]
+
+#%%
+# Process the table data
+table_json = process_table_to_json(tables[2])
+
+# Output the JSON
+print(table_json)
+
+# %%

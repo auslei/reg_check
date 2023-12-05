@@ -38,8 +38,8 @@ Consolidate and summarise the information below in bullet form, remove duplicate
 {text}
 """
 
-template = m.get_llama_prompt(instruction, sys_prompt)
-template2 = m.get_llama_prompt(instruction2, sys_prompt)
+#template = m.get_llama_prompt(instruction, sys_prompt)
+#template2 = m.get_llama_prompt(instruction2, sys_prompt)
 
 prompt_template = PromptTemplate(input_variables=['text'], template = template)
 prompt_template2 = PromptTemplate(input_variables=['text'], template = template2)
