@@ -228,21 +228,115 @@ print(example_cropped.extract_text())
 # %%
 tables = example_cropped.extract_tables()
 # %%
+import os
+import requests
+import pdfplumber
 import json
+from io import BytesIO
+import logging
+from tqdm import tqdm
 
+# Set up basic configuration for logging
+logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 
-class BCC_Page():
-    def __init__(self, text: str, bbox = (0, 60, 540, 820)) -> None:
+class PDFDocument:
+    """
+    A class to represent a PDF document, supporting loading from both a file and a URL.
+
+    Attributes:
+        bbox (tuple): The bounding box to define the area of interest in the PDF.
+        raw_text (str): The raw text associated with the PDF document.
+        path (str, optional): The path or URL of the PDF document.
+        loaded (bool): Flag to indicate if the PDF is successfully loaded.
+        pdf_source (str): Source type of the PDF - 'File', 'URL', or 'None'.
+        pdf (pdfplumber.PDF): The loaded pdfplumber object.
+    """
+
+    def __init__(self, bbox=(0, 60, 540, 820), path=None):
+        """
+        Initializes the PDFDocument with text, optional bounding box, and path.
+
+        Args:
+            text (str): The text associated with the PDF document.
+            bbox (tuple, optional): The bounding box as a tuple. Defaults to (0, 60, 540, 820).
+            path (str, optional): The file path or URL of the PDF. Defaults to None.
+        """
         self.bbox = bbox
-        self.raw_text = text
-        return
+        self.path = path
+        self.loaded = False
+        self.pdf = None
+        self.pdf_source = "None"
+        self.pages = {"page_number": [], "page_content": [], "page_tables": []}
 
-    # get the list of tables and return as a list of json objects
-    def _get_page_tables(self):
+        if path is None:
+            logging.warning("No path provided for PDFDocument.")
+            return
 
+        if os.path.isfile(path):
+            self._load_pdf_from_file(path)
+        elif path.startswith(('http://', 'https://')):
+            self._load_pdf_from_url(path)
+        else:
+            logging.error(f"Invalid path or URL: {path}")
+            return
 
+        if self.loaded:
+            self._load_pages()
+
+    def _load_pdf_from_file(self, path):
+        """Loads a PDF from a file."""
+        self.pdf_source = "File"
+        try:
+            self.pdf = pdfplumber.open(path)
+            self.loaded = True
+        except Exception as e:
+            logging.error(f"Failed to load PDF from file: {e}")
+            self.loaded = False
+
+    def _load_pdf_from_url(self, path):
+        """Loads a PDF from a URL."""
+        self.pdf_source = "URL"
+        try:
+            response = requests.get(path)
+            if response.status_code == 200:
+                self.pdf = pdfplumber.open(BytesIO(response.content))
+                self.loaded = True
+            else:
+                logging.error(f"Failed to download PDF, URL returned status code: {response.status_code}")
+                self.loaded = False
+        except Exception as e:
+            logging.error(f"Exception occurred while downloading PDF from URL: {e}")
+            self.loaded = False
+
+    def _load_pages(self):
+        """Load pages text into a list considering bbox"""
+        page_number = 0
+        for page in tqdm(self.pdf.pages):
+            page_number += 1
+            self.pages["page_number"].append(page_number)
+            self.pages["page_tables"].append(self._get_page_table(page))
+            self.pages["page_content"].append(self._get_page_text(page))
+
+    def _get_page_text(self, page):
+        """Extract text from the pdf page referenced"""
+        left, top, right, bottom = self.bbox
+        p_left, p_top, p_right, p_bottom = page.bbox
+ 
+        if p_right > right and p_bottom > bottom:  #if the bbox fit in the page
+            page_cropped = page.crop(self.bbox)
+        elif p_bottom > p_right and p_right > bottom: # if the bbox firt in landscape of the page
+            page_cropped = page.crop((left, top, bottom, right))
+        else:
+            page_cropped = page
+        text = page.extract_text()
+        return text
+
+    def _get_page_table(self, page):
+        """get list all tables (text) from the page"""
+        return page.extract_tables()
 
     def _process_table_to_json(table_data):
+        """Process table information retrieve into json file. This also handles merged columns"""
         # Replace None values in the first row with a specified fallback value
         fallback_value = table_data[0][2]  # Assuming 'Thickness of wall (T)' is at index 2
         table_data[0] = [fallback_value if item is None else item for item in table_data[0]]
@@ -264,6 +358,9 @@ class BCC_Page():
         }
 
         return json.dumps(table_json, indent=2)  # Convert to formatted JSON string
+
+pdf = PDFDocument(path = "./data/abcb-housing-provisions-2022-20230501b.pdf")
+#%%
 
 # Your table data
 table_data = [
