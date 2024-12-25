@@ -3,8 +3,14 @@
 .ipynb_checkpoints
 offload
 .DS_Store
-db/
+./db
 data/
 models/
 .DS_Store
-__pycache__
+./__pycache__
+._*
+*.pickle
+*.bin
+*.lock
+*.sqlite3
+*.pyc
